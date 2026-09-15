@@ -1,0 +1,41 @@
+name: Deploy website to S3
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test
+        run: |
+          echo "Running tests..."
+          test -f index.html || (echo "index.html missing" && exit 1)
+          test -f style.css   || (echo "style.css missing" && exit 1)
+          test -f script.js   || (echo "script.js missing" && exit 1)
+          grep -q "CI/CD Deployment Successful" index.html || (echo "Expected content missing" && exit 1)
+          echo "All tests passed."
+
+      - name: Build / Package
+        run: |
+          echo "Packaging site..."
+          mkdir -p dist
+          cp index.html style.css script.js dist/
+          ls -la dist
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Deploy to S3
+        run: |
+          aws s3 sync ./dist s3://${{ secrets.S3_BUCKET }} --delete
+          echo "Deployed to S3."
